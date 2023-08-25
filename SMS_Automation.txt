@@ -1,0 +1,94 @@
+# Importing necesasry libraries
+
+# import datetime
+# start_time = datetime.datetime.now()
+import pandas as pd
+import numpy as np
+import pyodbc
+import mysql.connector
+import requests
+
+dwh_con = mysql.connector.connect(
+    host="192.168.93.20",
+    user="DWH",
+    password="ENyZE#82",
+    database="dwh"
+)
+
+cursor = dwh_con.cursor()
+
+# Creating connection on Omni to retrieve customer/disbursal information
+
+# # query tom fetch required data
+
+query = """select * from sms_disbursal"""
+
+# Retrieving data from omni
+
+disb_data = cursor.execute(query)
+
+disb_data = cursor.fetchall()
+
+disb_data = pd.DataFrame(disb_data, columns=['loan_id', 'loan_no', 'disbursal_amount', 'Phone_no', 'Customer_Name', 'message', 'timestamp'])
+
+dest_query = ("""select * from sms_disbursal_test""")
+
+existing_data = cursor.execute(dest_query)
+
+existing_data = cursor.fetchall()
+
+existing_data = pd.DataFrame(existing_data, columns=['loan_id', 'loan_no', 'disbursal_amount', 'Phone_no', 'Customer_Name', 'message', 'timestamp'])
+
+data = disb_data[~disb_data['loan_id'].isin(existing_data['loan_id'])]
+
+# Preparing messgaes for all the customers
+
+for index, row in data.iterrows():
+    loan_id = row['loan_id']
+    Customer_Name = row['Customer_Name']
+    loan_no = row['loan_no']
+    disbursal_amount = row['disbursal_amount']
+    Phone_no = row['Phone_no']
+    Text = f"http://ip.shreesms.net/smsserver/SMS10N.aspx?GSM=UMDHFC&Userid=ummeed&UserPassword=12345&PhoneNumber={Phone_no}&Text=Dear Customer, We value your relationship with Ummeed Housing Finance . Your loan amount of Rs. {disbursal_amount} against loan number {loan_no} has been disbursed. Cheque can be collected on completion of disbursal conditions, please be in touch with your relationship manager.  For any Assistance or call 1800-2-126-127&Entityid=1701158175725243024&Templateid=1707169233305097302"
+    message = (f"Dear Customer, We value your relationship with Ummeed Housing Finance . Your loan amount of Rs. {disbursal_amount} against loan number {loan_no} has been disbursed. Cheque can be collected on completion of disbursal conditions, please be in touch with your relationship manager.  For any Assistance or call 1800-2-126-127&Entityid=1701158175725243024&Templateid=1707169233305097302")
+    
+    response = requests.get(Text)
+        
+# Checking the response
+    if response.status_code == 200:
+        insert_query = (f"INSERT INTO sms_disbursal_test values ('{loan_id}', '{loan_no}', {disbursal_amount}, '{Phone_no}', '{Customer_Name}', '{message}', now())")
+        cursor.execute(insert_query)
+        dwh_con.commit()
+        
+        print("Data inserted into MySQL table")
+    else:
+        print("Failed to send SMS")
+        print(response.Text)
+
+                        
+        
+Text = ""
+
+for index, row in data.iterrows():
+    loan_id = row['loan_id']
+    Customer_Name = row['Customer_Name']
+    loan_no = row['loan_no']
+    disbursal_amount = row['disbursal_amount']
+    Phone_no = row['Phone_no']
+    Text = f"http://ip.shreesms.net/LanguageSms/sms.aspx?UserID=ummeed&UserPassWord=12345&PhoneNumber={Phone_no}&text=प्रिय ग्राहक, हम उम्मीद हाउसिंग फाइनेंस के साथ आपके संबंधों को महत्व देते हैं। आपकी लोन राशि रु. {disbursal_amount} लोन संख्या {loan_no} का भुगतान किया गया है। संवितरण शर्तों के पूरा होने पर चेक एकत्र किया जा सकता है। किसी भी सहायता के लिए, अपने रिलेशनशिप मैनेजर से संपर्क करें या 1800-2-126-127 पर कॉल करें।&GSM=UMDHFC&Entityid=1701158175725243024&Templateid=1707169233381832282"
+    message = (f"प्रिय ग्राहक, हम उम्मीद हाउसिंग फाइनेंस के साथ आपके संबंधों को महत्व देते हैं। आपकी लोन राशि रु. {disbursal_amount} लोन संख्या {loan_no} का भुगतान किया गया है। संवितरण शर्तों के पूरा होने पर चेक एकत्र किया जा सकता है। किसी भी सहायता के लिए, अपने रिलेशनशिप मैनेजर से संपर्क करें या 1800-2-126-127 पर कॉल करें।&GSM=UMDHFC&Entityid=1701158175725243024&Templateid=1707169233381832282")
+    
+    response = requests.get(Text)
+        
+# Checking the response
+
+    if response.status_code == 200:
+#         insert_query = f"INSERT INTO sms_disbursal_test (loan_id, loan_no, disbursal_amount, Phone_no, Customer_Name, Text, Date_Time) VALUES ('{loan_id}', '{loan_no}', {disbursal_amount}, '{Phone_no}', '{Customer_Name}', '{message}', NOW())"
+        insert_query = (f"INSERT INTO sms_disbursal_test values ('{loan_id}', '{loan_no}', {disbursal_amount}, '{Phone_no}', '{Customer_Name}', '{message}', now())")
+        cursor.execute(insert_query)
+        dwh_con.commit()
+        print("Data inserted into MySQL table")
+    else:
+        print("Failed to send SMS")
+        print(response.Text)        
+    
